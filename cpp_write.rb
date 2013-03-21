@@ -49,82 +49,63 @@ def cpp_write(enum)
 
   values = convert_values(enum.values)
 
-  hpp = %{
-#ifndef #{header_guard}
+  fully_qualified_name =
+    (enum.namespace ? enum.namespace + "::" : '') + enum.name
+
+  fq_name_token = fully_qualified_name.tr(":","_");
+
+  hpp =
+%{#ifndef #{header_guard}
 #define #{header_guard}
 
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 
 #{namespace_open}
 
-class #{enum.name}
+enum class #{enum.name} #{enum.storage_type ? ": #{enum.storage_type}" : ""}
 {
-public:
-  enum class raw #{enum.storage_type ? ": #{enum.storage_type}" : ""}
-  {
-      #{values.map { |k,v|
-        v.class == String ? "#{k}='#{v}'" : "#{k}=#{v}"
-      }.join(",\n      ")
-    }
-  };
-
-  #{enum.name}();
-  #{enum.name}(#{enum.name} const &);
-  #{enum.name}(raw val);
-
-  #{enum.name} & operator=(#{enum.name} const &);
-  #{enum.name} & operator=(#{enum.name}::raw);
-
-#{values.map { |k,v|
-  "  static constexpr #{enum.name} #{k};"
-}.join("\n")}
-
-  raw value() const;
-  std::string const & name() const;
-
-  static #{enum.name} name_to_value(std::string const &);
-  static std::string const & value_to_name(#{enum.name});
-
-#{enum.code}
-private:
-  raw value_;
+    #{values.map { |k,v|
+      v.class == String ? "#{k}='#{v}'" : "#{k}=#{v}"
+    }.join(",\n      ")
+  }
 };
 
-bool operator==(#{enum.name}, #{enum.name});
-bool operator==(#{enum.name}::raw, #{enum.name});
-bool operator!=(#{enum.name}, #{enum.name});
-bool operator!=(#{enum.name}::raw, #{enum.name});
+template <class Enum> Enum name_to_value(std::string const &);
+
+std::string const & value_to_name(#{enum.name});
+
+#{enum.code}
 
 std::ostream & operator<<(std::ostream &, #{enum.name});
 std::istream & operator>>(std::istream &, #{enum.name} &);
 
 //--
 
-inline
-#{enum.name}::raw
-#{enum.name}::
-value() const
-{
-  return value_;
+namespace detail {
+  #{enum.name} #{fq_name_token}_name_to_value(std::string const &);
 }
 
+template <>
+inline
+#{enum.name} name_to_value(std::string const & name)
+{
+  return detail::#{fq_name_token}_name_to_value(name);
+}
+ 
 #{namespace_close}
 #endif
 }
 
-  fully_qualified_name =
-    (enum.namespace ? enum.namespace + "::" : '') + enum.name
   cpp = %{
 #include "#{enum.filename}.hpp"
 #include <iostream>
 #include <map>
+#include <stdexcept>
 
 #{namespace_open}
 
-#{values.map { |k,v|
-  "  #{enum.name} const #{enum.name}::#{k}(#{enum.name}::raw::#{k});"
-}.join("\n")}
 namespace
 {
   std::string const names[] =
@@ -136,7 +117,7 @@ namespace
 
   typedef std::map<std::string, #{fully_qualified_name}> Types;
   Types
-  get_type_map()
+  build_type_map()
   {
     Types type;
 #{values.map { |k,v|
@@ -146,107 +127,41 @@ namespace
     return type;
   }
 
-  Types types_map = get_type_map();
+  Types types_map = build_type_map();
+
 }
 
-
-  std::string const &
-  #{enum.name}::
-  value_to_name(#{enum.name} v)
+namespace detail {
+  #{enum.name} #{fq_name_token}_name_to_value(std::string const & name)
   {
-    switch (v.value())
-    {
-      #{i=-1; values.map { |k,v|
-        "case #{enum.name}::raw::#{k}: return names[#{i+=1}];"
-      }.join("\n      ")}
-    }
-    return names[#{values.length-1}];
-  }
-
-  #{enum.name}
-  #{enum.name}::
-  name_to_value(std::string const & name)
-  {
-    Types::iterator i = types_map.find(name);
+    auto i = types_map.find(name);
     if(i == types_map.end())
     {
-      #{if(enum.default_value)
-          "return #{enum.name}::#{enum.default_value};"
-        else
-          %Q{throw std::runtime_error("'" + name + "' is not a valid value.");}
-        end}
+       throw std::runtime_error("'" + name + "' is not a valid value.");
     }
     else
     {
       return i->second;
     }
   }
+}
 
   std::string const &
-  #{enum.name}::
-  name() const
+  value_to_name(#{enum.name} v)
   {
-    return value_to_name(this->value());
-  }
-
-  #{enum.name}::
-  #{enum.name}()
-  #{enum.default_value ? ": value_(raw::#{enum.default_value})" : ""}
-  {
-  }
-
-  #{enum.name}::
-  #{enum.name}(#{enum.name} const & other)
-  : value_(other.value())
-  {
-  }
-
-  #{enum.name}::
-  #{enum.name}(raw v)
-  : value_(v)
-  {
-  }
-
-  #{enum.name} &
-  #{enum.name}::
-  operator=(#{enum.name} const & other)
-  {
-    value_ = other.value();
-    return *this;
-  }
-
-  #{enum.name} &
-  #{enum.name}::
-  operator=(#{enum.name}::raw other)
-  {
-    value_ = other;
-    return *this;
-  }
-
-  bool operator==(#{enum.name} lhs, #{enum.name} rhs)
-  {
-    return lhs.value() == rhs.value();
-  }
-
-  bool operator==(#{enum.name}::raw lhs, #{enum.name} rhs)
-  {
-    return lhs == rhs.value();
-  }
-
-  bool operator!=(#{enum.name} lhs, #{enum.name} rhs)
-  {
-    return !(lhs == rhs);
-  }
-
-  bool operator!=(#{enum.name}::raw lhs, #{enum.name} rhs)
-  {
-    return !(lhs == rhs);
+    switch (v)
+    {
+      #{i=-1; values.map { |k,v|
+        "case #{enum.name}::#{k}: return names[#{i+=1}];"
+      }.join("\n      ")}
+    }
+    return names[#{values.length-1}];
   }
 
   std::ostream &
   operator<<(std::ostream & os, #{enum.name} v)
   {
-    return os << v.name();
+    return os << value_to_name(v);
   }
 
   std::istream &
@@ -254,7 +169,7 @@ namespace
   {
     std::string tmp;
     is >> tmp;
-    v = #{enum.name}::name_to_value(tmp);
+    v = name_to_value<#{enum.name}>(tmp);
     return is;
 
   }
