@@ -77,7 +77,7 @@ public:
   #{enum.name} & operator=(#{enum.name}::raw);
 
 #{values.map { |k,v|
-  "  static #{enum.name} const #{k};"
+  "  static constexpr #{enum.name} #{k};"
 }.join("\n")}
 
   raw value() const;
@@ -170,7 +170,11 @@ namespace
     Types::iterator i = types_map.find(name);
     if(i == types_map.end())
     {
-      return #{enum.name}::INVALID_;
+      #{if(enum.default_value)
+          "return #{enum.name}::#{enum.default_value};"
+        else
+          %Q{throw std::runtime_error("'" + name + "' is not a valid value.");}
+        end}
     }
     else
     {
@@ -187,7 +191,7 @@ namespace
 
   #{enum.name}::
   #{enum.name}()
-  : value_(raw::INVALID_)
+  #{enum.default_value ? ": value_(raw::#{enum.default_value})" : ""}
   {
   }
 
