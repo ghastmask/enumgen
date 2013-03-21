@@ -1,0 +1,12 @@
+enum("MyEnum") {
+  filename("MyEnum_gen")
+
+  namespace("nspace")
+
+  storage_type("char")
+
+  values(
+      "INVALID_" => 'b',
+      "FOO"=>'c'
+  )
+}

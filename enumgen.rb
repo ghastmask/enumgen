@@ -1,4 +1,4 @@
-require 'cpp_write'
+require_relative 'cpp_write'
 
 class Module
   def dsl_accessor(*symbols)
@@ -17,10 +17,11 @@ class Module
 end
 
 class Enum
-  dsl_accessor :filename, :namespace, :values
+  dsl_accessor :filename, :namespace, :values, :storage_type
   attr_reader :name
   def initialize(name)
     @name = name
+    @filename = @name
   end
 end
 
@@ -28,10 +29,22 @@ class Enumgen
   def enum(name, &block)
     e = Enum.new(name)
     e.instance_eval(&block)
-    cpp_write(e)
+    begin
+      cpp_write(e)
+    rescue Exception => e
+      raise "Error with enum #{name}: #{e}"
+    end
   end
 end
 
-eg = Enumgen.new
-lines = IO.read('enumtest.rb')
-eg.instance_eval(lines)
+if $0 == __FILE__
+  begin
+    eg = Enumgen.new
+    ARGV.each { |file|
+      lines = IO.read(file)
+      eg.instance_eval(lines)
+    }
+  rescue Exception => e
+    puts e
+  end
+end

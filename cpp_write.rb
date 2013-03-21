@@ -1,3 +1,5 @@
+require 'set'
+
 # Fixes up single values and arrays of values to give them indexes
 # Changes hash to sorted array of [key,value] tuples
 # returns the sorted array of [[enum value, name],..]
@@ -15,7 +17,28 @@ def convert_values(values)
   values_hash.sort_by {|k,v| v}
 end
 
+def validate_values(values)
+  if(!values)
+    raise "No values given."
+  end
+
+  return if values.class != Hash
+
+  value_types = Set.new
+  values.map { |k,v| 
+    value_types.add(v.class)
+    if(v.class == String)
+      raise "Must use a single character for enum values" if v.length != 1
+    end
+  }
+  if(value_types.length != 1)
+    raise "Only one type of value allowed in enum, found: #{value_types.to_a.join(", ")}"
+  end
+end
+
 def cpp_write(enum)
+  validate_values(enum.values)
+  
   namespace_open = enum.namespace.split("::").map { |name|
     "namespace #{name} {"
   }.join("\n")
@@ -30,6 +53,7 @@ def cpp_write(enum)
 #ifndef #{header_guard}
 #define #{header_guard}
 
+##include <cstdint>
 #include <string>
 
 #{namespace_open}
@@ -37,42 +61,39 @@ def cpp_write(enum)
 class #{enum.name}
 {
 public:
-  struct raw
+  enum class raw #{enum.storage_type ? ": #{enum.storage_type}" : ""}
   {
-    enum Value_
-    {
       #{values.map { |k,v|
-        "#{k}=#{v}"
+        v.class == String ? "#{k}='#{v}'" : "#{k}=#{v}"
       }.join(",\n      ")
     }
-    };
   };
 
   #{enum.name}();
   #{enum.name}(#{enum.name} const &);
-  #{enum.name}(raw::Value_ val);
+  #{enum.name}(raw val);
 
   #{enum.name} & operator=(#{enum.name} const &);
-  #{enum.name} & operator=(#{enum.name}::raw::Value_);
+  #{enum.name} & operator=(#{enum.name}::raw);
 
 #{values.map { |k,v|
   "  static #{enum.name} const #{k};"
 }.join("\n")}
 
-  raw::Value_ value() const;
+  raw value() const;
   std::string const & name() const;
 
   static #{enum.name} name_to_value(std::string const &);
   static std::string const & value_to_name(#{enum.name});
 
 private:
-  raw::Value_ value_;
+  raw value_;
 };
 
 bool operator==(#{enum.name}, #{enum.name});
-bool operator==(#{enum.name}::raw::Value_, #{enum.name});
+bool operator==(#{enum.name}::raw, #{enum.name});
 bool operator!=(#{enum.name}, #{enum.name});
-bool operator!=(#{enum.name}::raw::Value_, #{enum.name});
+bool operator!=(#{enum.name}::raw, #{enum.name});
 
 std::ostream & operator<<(std::ostream &, #{enum.name});
 std::istream & operator>>(std::istream &, #{enum.name} &);
@@ -80,7 +101,7 @@ std::istream & operator>>(std::istream &, #{enum.name} &);
 //--
 
 inline
-#{enum.name}::raw::Value_
+#{enum.name}::raw
 #{enum.name}::
 value() const
 {
@@ -94,7 +115,7 @@ value() const
   fully_qualified_name =
     (enum.namespace ? enum.namespace + "::" : '') + enum.name
   cpp = %{
-#include "#{enum.name}.hpp"
+#include "#{enum.filename}.hpp"
 #include <iostream>
 #include <map>
 
@@ -176,7 +197,7 @@ namespace
   }
 
   #{enum.name}::
-  #{enum.name}(raw::Value_ v)
+  #{enum.name}(raw v)
   : value_(v)
   {
   }
@@ -191,7 +212,7 @@ namespace
 
   #{enum.name} &
   #{enum.name}::
-  operator=(#{enum.name}::raw::Value_ other)
+  operator=(#{enum.name}::raw other)
   {
     value_ = other;
     return *this;
@@ -202,7 +223,7 @@ namespace
     return lhs.value() == rhs.value();
   }
 
-  bool operator==(#{enum.name}::raw::Value_ lhs, #{enum.name} rhs)
+  bool operator==(#{enum.name}::raw lhs, #{enum.name} rhs)
   {
     return lhs == rhs.value();
   }
@@ -212,7 +233,7 @@ namespace
     return !(lhs == rhs);
   }
 
-  bool operator!=(#{enum.name}::raw::Value_ lhs, #{enum.name} rhs)
+  bool operator!=(#{enum.name}::raw lhs, #{enum.name} rhs)
   {
     return !(lhs == rhs);
   }
@@ -236,6 +257,6 @@ namespace
 #{namespace_close}
   }
   
-  File.open(enum.name + ".hpp", "w") {|f| f.write(hpp)} 
-  File.open(enum.name + ".cpp", "w") {|f| f.write(cpp)} 
+  File.open(enum.filename + ".hpp", "w") {|f| f.write(hpp)} 
+  File.open(enum.filename + ".cpp", "w") {|f| f.write(cpp)} 
 end
