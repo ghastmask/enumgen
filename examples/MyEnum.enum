@@ -9,4 +9,6 @@ enum("MyEnum") {
       "INVALID_" => 'b',
       "FOO"=>'c'
   )
+
+  code("// this is additional code for the enum")
 }

@@ -25,7 +25,7 @@ def validate_values(values)
   return if values.class != Hash
 
   value_types = Set.new
-  values.map { |k,v| 
+  values.map { |k,v|
     value_types.add(v.class)
     if(v.class == String)
       raise "Must use a single character for enum values" if v.length != 1
@@ -38,7 +38,7 @@ end
 
 def cpp_write(enum)
   validate_values(enum.values)
-  
+
   namespace_open = enum.namespace.split("::").map { |name|
     "namespace #{name} {"
   }.join("\n")
@@ -53,7 +53,7 @@ def cpp_write(enum)
 #ifndef #{header_guard}
 #define #{header_guard}
 
-##include <cstdint>
+#include <cstdint>
 #include <string>
 
 #{namespace_open}
@@ -86,6 +86,7 @@ public:
   static #{enum.name} name_to_value(std::string const &);
   static std::string const & value_to_name(#{enum.name});
 
+#{enum.code}
 private:
   raw value_;
 };
@@ -251,12 +252,12 @@ namespace
     is >> tmp;
     v = #{enum.name}::name_to_value(tmp);
     return is;
-    
+
   }
 
 #{namespace_close}
   }
-  
-  File.open(enum.filename + ".hpp", "w") {|f| f.write(hpp)} 
-  File.open(enum.filename + ".cpp", "w") {|f| f.write(cpp)} 
+
+  File.open(enum.filename + ".hpp", "w") {|f| f.write(hpp)}
+  File.open(enum.filename + ".cpp", "w") {|f| f.write(cpp)}
 end
