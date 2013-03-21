@@ -36,6 +36,14 @@ def validate_values(values)
   end
 end
 
+def extra_interface_includes(enum)
+  [*enum.interface_includes].map { |val| "#include #{val}" }.join("\n")
+end
+
+def extra_implementation_includes(enum)
+  [*enum.implementation_includes].map { |val| "#include #{val}" }.join("\n")
+end
+
 def cpp_write(enum)
   validate_values(enum.values)
 
@@ -61,6 +69,7 @@ def cpp_write(enum)
 #include <cstdint>
 #include <iosfwd>
 #include <string>
+#{extra_interface_includes(enum)}
 
 #{namespace_open}
 
@@ -76,7 +85,7 @@ template <class Enum> Enum name_to_value(std::string const &);
 
 std::string const & value_to_name(#{enum.name});
 
-#{enum.code}
+#{enum.interface_code}
 
 std::ostream & operator<<(std::ostream &, #{enum.name});
 std::istream & operator>>(std::istream &, #{enum.name} &);
@@ -103,6 +112,7 @@ inline
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#{extra_implementation_includes(enum)}
 
 #{namespace_open}
 
@@ -173,6 +183,8 @@ namespace detail {
     return is;
 
   }
+
+#{enum.implementation_code}
 
 #{namespace_close}
   }

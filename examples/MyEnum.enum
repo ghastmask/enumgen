@@ -1,14 +1,17 @@
 enum("MyEnum") {
-  filename("MyEnum_gen")
+  interface_includes('"SomeFile.hpp"')
+  implementation_includes('"OtherFile.hpp"')
+
+  filename("MyEnum")
 
   namespace("nspace")
 
   storage_type("char")
 
   values(
-      "INVALID_" => 'b',
       "FOO"=>'c'
   )
+  interface_code("// this goes in interface")
 
-  code("// this is additional code for the enum")
+  implementation_code("// this goes in implementation")
 }

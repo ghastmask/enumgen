@@ -17,7 +17,9 @@ class Module
 end
 
 class Enum
-  dsl_accessor :filename, :namespace, :values, :storage_type, :code, :default_value, :extra_includes
+  dsl_accessor :filename, :namespace, :values, :storage_type,
+               :interface_code, :implementation_code,
+               :interface_includes, :implementation_includes
   attr_reader :name
   def initialize(name)
     @name = name
