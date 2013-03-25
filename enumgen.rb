@@ -28,14 +28,15 @@ class Enum
 end
 
 class Enumgen
+  attr_reader :enums
+  def initialize
+    @enums = []
+  end
+
   def enum(name, &block)
     e = Enum.new(name)
     e.instance_eval(&block)
-    begin
-      cpp_write(e)
-    rescue Exception => e
-      raise "Error with enum #{name}: #{e}"
-    end
+    @enums << e
   end
 end
 
@@ -46,6 +47,12 @@ if $0 == __FILE__
       lines = IO.read(file)
       eg.instance_eval(lines)
     }
+
+    eg.enums.each { |e|
+      cpp_writer = Cpp_Writer.new(e)
+      cpp_writer.write()
+    }
+
   rescue Exception => e
     puts e
   end
