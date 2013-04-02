@@ -75,7 +75,7 @@ class Cpp_Writer
   end
 
   def interface_includes
-    ["stdint.h", "iosfwd", "string"].map { |file|
+    ["stdint.h", "stdexcept", "map", "iosfwd", "string"].map { |file|
       "#include <#{file}>"
     }.join("\n")
   end
@@ -109,17 +109,26 @@ class Cpp_Writer
     fq_name_token = fully_qualified_name.tr(":","_");
   end
 
-  def string_conversion_implementations
-    %Q{
-namespace detail {
-    #{@enum.name} #{fq_name_token}_name_to_value(std::string const &);
-}
+  def name_to_value_exception
+     %Q{throw std::runtime_error("'" + name + "' is not a valid value.");}
+  end
 
+  def name_to_value_impl
+    %Q{
 template <>
 inline
-    #{@enum.name} name_to_value(std::string const & name)
+#{@enum.name}
+name_to_value(std::string const & name)
 {
-  return detail::#{fq_name_token}_name_to_value(name);
+  auto i = detail::#{@enum.name}_enum::types_map.find(name);
+  if(i == detail::#{@enum.name}_enum::types_map.end())
+  {
+     #{name_to_value_exception}
+  }
+  else
+  {
+    return i->second;
+  }
 }}
   end
 
@@ -143,10 +152,12 @@ inline
     hpp += extra_interface_includes + section_spacing
     hpp += open_namespace + section_spacing
     hpp += enum_class + section_spacing
+    hpp += string_and_value_holders + section_spacing
     hpp += string_conversion_interfaces + section_spacing
     hpp += stream_interfaces + section_spacing
     hpp += @enum.interface_code + section_spacing
-    hpp += string_conversion_implementations + section_spacing
+    hpp += name_to_value_impl + section_spacing
+    hpp += value_to_name_impl + section_spacing
     hpp += close_namespace + section_spacing
     hpp += header_guard_end
   end
@@ -159,8 +170,8 @@ inline
   end
 
   def type_map
-%Q{namespace
-{
+%Q{namespace detail {
+namespace #{@enum.name}_enum {
   std::string const names[] =
   {
       #{@values.map { |k,v|
@@ -181,59 +192,53 @@ inline
   }
 
   Types types_map = build_type_map();
-
-}}
+}}}
   end
 
-  def name_to_value_impl
-%Q{namespace detail {
-  #{@enum.name} #{fq_name_token}_name_to_value(std::string const & name)
-  {
-    auto i = types_map.find(name);
-    if(i == types_map.end())
-    {
-       throw std::runtime_error("'" + name + "' is not a valid value.");
-    }
-    else
-    {
-      return i->second;
-    }
-  }
-}}
+  def string_and_value_holders
+%Q{namespace detail { namespace #{@enum.name}_enum {
+  extern std::string const names[];
+  extern std::map<std::string, #{fully_qualified_name}> types_map;
+}}}
+  end
+
+  def value_to_name_exception
+    %Q{throw std::runtime_error("Invalid value given for #{@enum.name}");}
   end
 
   def value_to_name_impl
   %Q{
-  std::string const &
-  value_to_name(#{@enum.name} v)
+inline
+std::string const &
+value_to_name(#{@enum.name} v)
+{
+  switch (v)
   {
-    switch (v)
-    {
-    #{i=-1; @values.map { |k,v|
-    "case #{@enum.name}::#{k}: return names[#{i+=1}];"
-    }.join("\n      ")}
-    }
-    throw std::runtime_error("Invalid value given for #{@enum.name}");
-  }}
+  #{i=-1; @values.map { |k,v|
+  "  case #{@enum.name}::#{k}: return detail::#{@enum.name}_enum::names[#{i+=1}];"
+  }.join("\n      ")}
+  }
+  #{value_to_name_exception}
+}}
   end
 
   def stream_implementations
   %Q{
-  std::ostream &
-  operator<<(std::ostream & os, #{@enum.name} v)
-  {
-    return os << value_to_name(v);
-  }
+std::ostream &
+operator<<(std::ostream & os, #{@enum.name} v)
+{
+  return os << value_to_name(v);
+}
 
-  std::istream &
-  operator>>(std::istream & is, #{@enum.name} & v)
-  {
-    std::string tmp;
-    is >> tmp;
-    v = name_to_value<#{@enum.name}>(tmp);
-    return is;
+std::istream &
+operator>>(std::istream & is, #{@enum.name} & v)
+{
+  std::string tmp;
+  is >> tmp;
+  v = name_to_value<#{@enum.name}>(tmp);
+  return is;
 
-  }}
+}}
 
   end
 
@@ -244,8 +249,6 @@ inline
     cpp += extra_implementation_includes + section_spacing
     cpp += open_namespace + section_spacing
     cpp += type_map + section_spacing
-    cpp += name_to_value_impl + section_spacing
-    cpp += value_to_name_impl + section_spacing
     cpp += stream_implementations + section_spacing
     cpp += @enum.implementation_code + section_spacing
     cpp += close_namespace
