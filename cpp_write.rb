@@ -75,7 +75,7 @@ class Cpp_Writer
   end
 
   def interface_includes
-    ["stdint.h", "stdexcept", "map", "iosfwd", "string"].map { |file|
+    ["cstdint", "stdexcept", "map", "iosfwd", "string"].map { |file|
       "#include <#{file}>"
     }.join("\n")
   end
@@ -120,14 +120,19 @@ inline
 #{@enum.name}
 name_to_value(std::string const & name)
 {
-  auto i = detail::#{@enum.name}_enum::types_map.find(name);
-  if(i == detail::#{@enum.name}_enum::types_map.end())
+  using namespace detail::#{@enum.name}_enum;
+  auto i = std::lower_bound(
+      types_map,
+      types_map_end,
+      name,
+      [] (Type_Map const & m, std::string const & n)  { return m.first < n; });
+  if(i != types_map_end && i->first == name)
   {
-     #{name_to_value_exception}
+    return i->second;
   }
   else
   {
-    return i->second;
+     #{name_to_value_exception}
   }
 }}
   end
@@ -170,35 +175,35 @@ name_to_value(std::string const & name)
   end
 
   def type_map
+    sorted_values = @values.sort { |a,b| a[0] <=> b[0] }
 %Q{namespace detail {
 namespace #{@enum.name}_enum {
   std::string const names[] =
   {
-      #{@values.map { |k,v|
-      "    \"#{k}\""
-    }.join(",\n")}
+    #{@values.map { |k,v|
+      "\"#{k}\""
+    }.join(",\n    ")}
   };
 
-  typedef std::map<std::string, #{fully_qualified_name}> Types;
-  Types
-  build_type_map()
+  Type_Map const types_map[] =
   {
-    Types type;
-    #{@values.map { |k,v|
-    "type[\"#{k}\"] = #{fully_qualified_name}::#{k};"
-    }.join("\n")
+    #{sorted_values.map { |k,v|
+    "{\"#{k}\" , #{fully_qualified_name}::#{k} }"
+    }.join(",\n    ")
     }
-    return type;
-  }
+  };
 
-  Types types_map = build_type_map();
+  Type_Map const * types_map_end = types_map + (sizeof(types_map) / sizeof(types_map[0]));
+
 }}}
   end
 
   def string_and_value_holders
 %Q{namespace detail { namespace #{@enum.name}_enum {
   extern std::string const names[];
-  extern std::map<std::string, #{fully_qualified_name}> types_map;
+  typedef std::pair< std::string, #{fully_qualified_name} > Type_Map;
+  extern Type_Map const types_map[];
+  extern Type_Map const * types_map_end;
 }}}
   end
 
