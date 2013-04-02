@@ -149,6 +149,11 @@ name_to_value(std::string const & name)
   def section_spacing
     "\n\n"
   end
+
+  def interface_code
+    @enum.interface_code
+  end
+
   def header_file
     hpp = ""
     hpp += header_guard_begin + section_spacing
@@ -160,7 +165,7 @@ name_to_value(std::string const & name)
     hpp += string_and_value_holders + section_spacing
     hpp += string_conversion_interfaces + section_spacing
     hpp += stream_interfaces + section_spacing
-    hpp += @enum.interface_code + section_spacing
+    hpp += interface_code + section_spacing
     hpp += name_to_value_impl + section_spacing
     hpp += value_to_name_impl + section_spacing
     hpp += close_namespace + section_spacing
@@ -247,6 +252,10 @@ operator>>(std::istream & is, #{@enum.name} & v)
 
   end
 
+  def implementation_code
+    @enum.implementation_code
+  end
+
   def cpp_file
     cpp = ""
     cpp += implementation_includes + section_spacing
@@ -255,7 +264,7 @@ operator>>(std::istream & is, #{@enum.name} & v)
     cpp += open_namespace + section_spacing
     cpp += type_map + section_spacing
     cpp += stream_implementations + section_spacing
-    cpp += @enum.implementation_code + section_spacing
+    cpp += implementation_code + section_spacing
     cpp += close_namespace
   end
 
