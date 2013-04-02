@@ -75,7 +75,7 @@ class Cpp_Writer
   end
 
   def interface_includes
-    ["cstdint", "stdexcept", "map", "iosfwd", "string"].map { |file|
+    ["cstdint", "stdexcept", "map", "algorithm", "iosfwd", "string"].map { |file|
       "#include <#{file}>"
     }.join("\n")
   end
